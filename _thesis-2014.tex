@@ -1,0 +1,45 @@
+ \documentclass[master, english]{hgbthesis}
+
+\graphicspath{{images/}}
+\AddBibFile{library.bib}
+
+\makeatletter
+\newcommand\footnoteref[1]{\protected@xdef\@thefnmark{\ref{#1}}\@footnotemark}
+\makeatother
+
+\begin{document}
+
+\title{Using Event- and Actor-driven Paradigms to Increase Web Server Performance}
+
+\author{Felix Hessenberger}
+\studiengang{Interactive Media}
+\studienort{Hagenberg}
+\abgabedatum{2014}{06}{30} 
+
+\frontmatter
+\maketitle
+\tableofcontents 
+	
+\include{00_abstract}			
+
+\include{01_kurzfassung}		
+
+\mainmatter	
+
+\include{10_introduction}
+
+\include{20_technical}
+
+\include{30_stateoftheart}
+
+\include{40_implementation}
+
+\include{50_evaluation}
+
+\include{60_conclusion}
+ 
+\appendix
+
+\MakeBibliography{References}
+
+\end{document}
