@@ -17,8 +17,9 @@ A Web framework aims to facilitate development by including frequently used capa
 This chapter presents selected approaches to performance-critical event-based and actor-based concurrency abstraction with respect to the criteria defined in section \ref{sec:terms} and taking into account the technical issues elaborated in section \ref{sec:concurrency}.
 
 \section{Event-based technologies}
-
+\label{sec:evnt}
 \subsection{Node.js}
+\label{sec:nodejs}
 
 \textit{Node.js}\footnote{\url{http://nodejs.org/}} is not only a framework, but rather a dedicated open source software platform for purely event-driven applications. User-level code is written in \textit{JavaScript} and interpreted by the \textit{V8}\footnote{\url{https://code.google.com/p/v8/}} engine also used in the \textit{Google Chrome}\footnote{\url{https://www.google.com/intl/en/chrome/browser/}} Web browser \cite[p. 19]{Hughes-Croucher2012}. This is reasonable since \textit{JavaScript} was originally used primarily for programming client-side website behaviour; however, Node.js uses a module system\footnote{Using the \textit{CommonJS} module specification (\url{http://www.commonjs.org/})} to add various Web server-specific features. These features include -- among others -- networking abstractions, file and operating system abstractions and replication and scheduling utilities\footnote{See \url{http://nodejs.org/api/} for an exhaustive list of system modules or \url{https://www.npmjs.org/} for a popular extension module repository}. The platform also includes its own Web server via the \texttt{http} module.
 
@@ -138,6 +139,7 @@ In this figure taken from a performance analysis of D. Torstensson and E. Eloff,
 \end{figure}
 
 \subsection{Eventmachine}
+\label{sec:eventmachine}
 Ruby\footnote{\url{https://www.ruby-lang.org}} is a dynamic programming language that has a high adoption rate due to the popular \textit{Ruby on Rails} MVC framework that powers a lot of modern Websites \cite[p. 11]{Orsini2008}. However, unlike \textit{JavaScript}, \textit{Ruby} was not conceived with non-blocking event-driven behaviour in mind. \textit{Eventmachine} is a library that aims to facilitate the process of developing non-blocking Web server applications in \textit{Ruby}.
 
 \subsubsection*{Development}
@@ -153,7 +155,7 @@ while true
     }
 end  \end{JavaCode}\end{program}
 
-To create a non-blocking networking server in \textit{Ruby}, more complex operations are needed. This includes creating and managing an event-loop\footnote{Strictly speaking, since no events are involved this is called a \textit{reactor loop} \cite{Gupta2010}.} from scratch and using the \texttt{IO} class and the \texttt{accept\_nonblock} method of the \texttt{TCPSocket} class to create logical concurrency on one thread. Operations like handling connections and reading input from the sockets also have to be managed by the developer \cite{Gupta2010}.
+To create a non-blocking networking server in \textit{Ruby}, more complex operations are needed. This includes creating and managing a complete event-loop\footnote{Strictly speaking, since no events are involved this is called a \textit{reactor loop} \cite{Gupta2010}.} and using the \texttt{IO} class and the \texttt{accept\_nonblock} method of the \texttt{TCPSocket} class to create logical concurrency on one thread (an exhaustive example can be seen in \cite{Gupta2010}). Operations like handling connections and reading input from the sockets also have to be managed by the developer \cite{Gupta2010}.
 
 \begin{program}  \caption{A simple echo server, i.e. a server that responds in a simple way depending on what the request contains. A \textit{Ruby} module (line 5) contains the necessary logic and is managed by the \textit{EventMachine} system. Line 10 initialises the reactor loop and line 11 starts the server using the predefined module.}  \label{prog:ruby-em}  \begin{JavaCode}
 require 'rubygems'
@@ -176,7 +178,7 @@ EventMachine::run {
   \item Creating a module with the appropriate methods for handling connections (see program \ref{prog:ruby-em})
   \item Using a block (see program \ref{prog:ruby-sync}) and overriding methods of the connection object passed as parameter
 \end{itemize}
-Program \ref{prog:ruby-em} demonstrates, how the simple TCP server from program \ref{prog:ruby-sync} can be implemented using the \textit{EventMachine} reactor. Besides this comprehensible TCP communication functionality, \textit{EventMachine} also includes functionality for deferring or postponing program logic. Deferring is important when interacting with code that would normally block the event-loop (see program \ref{prog:ruby-defer}). The \texttt{Timer} class or the \texttt{add\_timer} and \texttt{add\_periodic\_timer} methods can be used to execute program logic at an arbitrary point in time (e.g. for scheduled or recurring tasks).
+Program \ref{prog:ruby-em} demonstrates, how the simple TCP server from program \ref{prog:ruby-sync} can be implemented using the \textit{EventMachine} reactor. Besides this comprehensible TCP communication functionality, \textit{EventMachine} also includes functionality for deferring or postponing program logic. Deferring is important when interacting with code that would normally block the event-loop (see program \ref{prog:ruby-defer}). The \texttt{Timer} class or the \texttt{add\_timer} and \texttt{add\_periodic\_timer} methods can be used to execute program logic at an arbitrary point in time (e.g. for scheduled or recurring tasks). There is also a \texttt{Queue} comprehension for managing multiple asynchronous tasks at once (cf. the \texttt{all} comprehension of the \textit{Q} library in section \ref{lab:nodehttp}). 
 
 \begin{program}  \caption{An example of using \textit{EventMachine} to archieve \textit{JavaScript}-like callback functionality in \textit{Ruby}. A long-running operation can be put in a block, the execution of which is managed by \textit{EventMachine} via its threadpool. After the execution has completed, the result is passed to another block (i.e. the ``callback'') as a parameter.}  \label{prog:ruby-defer}  \begin{JavaCode}
 operation = proc {
@@ -189,17 +191,85 @@ callback = proc { |result|
 EventMachine.defer(operation, callback)  \end{JavaCode}\end{program}
 
 \subsubsection*{Scalability and Performance}
+Like \textit{JavaScript}, \textit{Ruby} is an interpreted scripting language and as such performance is inherently inferior to compiled languages\footnote{However, Web servers that focus heavily on I/O-bound operations like network and database communication may not need as much CPU performance as e.g. a server used for image processing.} (see section \ref{sec:nodejs}, \textit{Performance}). When using the default \textit{Ruby} VM\footnote{Virtual Machine, a program that executes code inside a dedicated environment.}, a security measure called \textit{Global Interpreter Lock} prevents program threads from archiving physical concurrency by only executing one logical thread at one(see figure \ref{fig:gil}). This is done to prevent sharing non thread-safe code with other threads \cite{ruby-gil}. Thus, to scale a \textit{Ruby} application running on the default virtual machine, several process instances have to be created. This is similar to \textit{Node.js} and many implications that apply to scaling \textit{Node.js} applications also apply to \textit{Ruby}. \textit{JRuby}\footnote{\url{http://jruby.org/}} is an alternative implementation of the \textit{Ruby} interpreter which theoretically allows for controlling physical concurrency at application level \cite{ruby-gil}.
 
+\begin{figure}
+\centering\small
+\setlength{\tabcolsep}{0mm}
+  \includegraphics[width=.80\textwidth]{ruby-gil}
+\caption{
+The Global Interpreter Lock of the \textit{Ruby} VM prevents application logic to control parallel program execution on OS threads because it executes only one \textit{Ruby} thread at once. However, with \textit{JRuby}, this is possible. Image source: \cite{ruby-gil}}
+\label{fig:gil}
+\end{figure}
 
 \subsection{Others}
-React, Derby, Twisted, Java NIO
+There are numerous other examples of event-driven concurrency frameworks that are less documented or fitting to be presented in depth here. \textit{React}\footnote{\url{http://reactphp.org/}} is a framework written in \textit{PHP}\footnote{\url{https://php.net/}}, a scripting language that is often used in simple Web server applications \cite[p. 36]{Erb2012}. \textit{Twisted}\footnote{\url{https://twistedmatrix.com/}} is a reactor library for the \textit{Python}\footnote{\url{https://www.python.org/}} scripting language; its capabilities are similar to the \textit{EventMachine} library presented in section \ref{sec:eventmachine}. \textit{Java NIO}\footnote{Native Input and Output} (see section \ref{lab:stack}) is a general interface for non-blocking I/O operations that allows for creating asynchronous Web server applications.
 
 \section{Actor-based technologies}
 
-\subsection{Play!} \newpage a \newpage a \newpage a \newpage a \newpage a
+\subsection{Play!}
+\textit{Play!}\footnote{\url{http://www.playframework.com/}} is a full-stack Web application framework for development in \textit{Scala}\footnote{\url{http://www.scala-lang.org/}} and \textit{Java}. Since both languages are compiled to \textit{Java} bytecode and run on the \textit{Java} VM, both languages can be used side by side and libraries from the exhaustive \textit{Java} ecosystem can be included; as of version 2, the \textit{Play!} framework is written solely in \textit{Scala} \cite{Scala}. \textit{Play!} uses the \textit{Akka}\footnote{\url{http://akka.io/}} actor system, which is -- like the \textit{Scala} language and \textit{Play!} itself -- managed by \textit{Typesafe Inc.}\footnote{\url{https://typesafe.com/}}; all three products are available as an integrated environment called \textit{Activator}. 
 
-The Scala Actor Model
+\subsubsection*{Development}
+\textit{Play!} is different from all aforementioned frameworks (see section \ref{sec:evnt}), not only in the sense that it uses actor-based concurrency, but also in that it is based on a compiled programming language rather than an interpreted scripting language. \textit{Scala} is a rather young\footnote{Introduced in 2003} programming language that is syntactically very similar to \textit{Java}, but extends it with functional programming paradigms and a more sophisticated type system. Since it has native support for comprehensions associated with concurrency and a more concise syntax, it is better suited for applications with a high amount of application-level concurrency operations \cite[p. 9]{Scala}; therefore, in this section \textit{Play!}'s functionality is presented using \textit{Scala}.
 
+\textit{Play!} builds upon the MVC\footnote{Model-View-Controller} model, which means that incoming requests are handled by a user-defined controller structure. A controller contains \textit{Actions}, i.e. methods that are called when a certain type of request arrives. Each controller method must return an object of the class \texttt{Result}, which contains the data to be sent back to the client \cite[p. 27]{Reelsen2011}. When defining an action, there are two basic types of actions in terms of concurrency -- synchronous and asynchronous. Asynchronous actions must return an object of the type \texttt{Future[Result]}. A \textit{Future} is similar to a \textit{Promise} (see section \ref{sec:nodejs}, \textit{Development}) and indicates that the result is not available at the momentary point of execution, but at an arbitrary time in the future; only when the calculation of the result has finished (either successfully or due to failure) the response is sent to the client (see program \ref{prog:scala-actions1} and \ref{prog:scala-actions2}, respectively) \cite[p. 86]{Scala}. 
+
+\begin{program}  \caption{This program contains a very simple demonstration of how application-level code integrates with the \textit{Play!} framework. \texttt{def} defines a new method, which is wrapped by the \texttt{Action} constructor method. The actual method logic is passed to the \texttt{Action} wrapper as a block, which has to return a \texttt{Result} object. The \texttt{Ok} method in line 4 converts a string to a \texttt{Result} object with the HTTP status code 200, indicating a successful operation with a non-empty response.}  \label{prog:scala-actions1}  \begin{JavaCode}
+// Synchronous action
+def shortProcessingRequest = Action {
+    val result = (2 + 2).toString
+    Ok(result)
+}  \end{JavaCode}
+\end{program}\begin{program}  \caption{Returning asynchronous results is slightly more complex than returning synchronous results (see program \ref{prog:scala-actions1}). Using the \texttt{async} method of the \texttt{Action} object, a block returning a future result can be invoked. The \texttt{ContactDatabase.findById} method is a fictional database query that returns e.g. a \texttt{Future[Contact]} object. Since the block expects a \texttt{Future[Result]} object as a return value, the database result has to be \textit{mapped} to an action result. The \texttt{map} method invokes a new block, which is executed when the future operation is resolved successfully. This block receives the non-future result as a parameter, which is wrapped by the \texttt{Ok} method. Thus, the result type of the statement in line 3 changes from \texttt{Future[Contact]} to \texttt{Future[Result]}.}  \label{prog:scala-actions2}  \begin{JavaCode}
+// Asynchronous action
+def longDatabaseRequest = Action.async {
+    ContactDatabase.findById(123) map {
+        result =>
+            Ok(result.toString)
+    }
+}  \end{JavaCode}\end{program}
+
+\textit{Scala} provides various language features and libraries for handling concurrency like the \texttt{scala.concurrent} library, which includes versatile comprehensions for resolving one or multiple future results. However, \textit{Play!} includes the \textit{Akka} actor system and the respective libraries to even further facilitate concurrent processing. \textit{Akka} is used by \textit{Play!} internally for various tasks like request handling, but it can also be used at application-level \cite[p. 83]{Scala}. The actor system can be used for scheduling one-time and recurring operations, but its eponymous use is to manage actors (see section \ref{lab:actormodel}). In \textit{Play!}, explicitly used actors are well-suited for autonomous tasks like handling communication with third-party Web services or sending emails. See program \ref{prog:scala-actors} for a code example and section \ref{sec:impl} for more detailed use-case explanations.
+
+\begin{program}  \caption{This program is a demonstration of a simple actor used to send emails. The actor class inherits from the \texttt{Actor} class of the \textit{Akka} library. As mentioned in section \ref{lab:actormodel}, actors do not share any state and communicate via messages. The actor class has to implement the \texttt{receive} method, which is called when messages arrive. Messages can have any type, but are usually sent via different \textit{case classes} (see line 1 to 9), depending on the context of the message. For sending an email, these classes would contain for instance an email address and some text content. The \texttt{receive} method uses a block with \textit{pattern matching} to determine the message type. Based on the message type, different actions can be taken by the actor. To send a message to an actor, the actor reference can be generated by the actor system (see line 28). Messages can be sent using the \texttt{!} method, the \texttt{?} method can be used to ``ask'' the actor, i.e. send a message and act upon a future response.}  \label{prog:scala-actors}  \begin{JavaCode}
+case class DefaultMail(
+    email: String,
+    content: String
+)
+
+case class ImageMail(
+    email: String,
+    image: String
+)
+
+class Mailer extends Actor {
+    
+    def receive = {
+        case DefaultMail(email, content) =>
+            sendDefaultMail(email, content)
+        case ImageMail(email, image) =>
+            sendImageMail(email, image)
+    }
+
+    def sendDefaultMail ...
+
+    def sendImageMail ...
+
+}
+
+class Test {
+    
+    val mailer = Akka.system.actorOf(Props[Mailer])
+
+    def test() = {
+        mailer ! DefaultMail("john@doe.com", "Hello John")
+    }
+
+}  \end{JavaCode}\end{program}
+
+\subsubsection*{Scalability}
+dsf
 
 \subsection{Lattice} \newpage a \newpage a
 
