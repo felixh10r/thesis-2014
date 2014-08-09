@@ -203,11 +203,13 @@ The Global Interpreter Lock of the \textit{Ruby} VM prevents application logic t
 \end{figure}
 
 \subsection{Others}
+\label{lab:other-event}
 There are numerous other examples of event-driven concurrency frameworks that are less documented or fitting to be presented in depth here. \textit{React}\footnote{\url{http://reactphp.org/}} is a framework written in \textit{PHP}\footnote{\url{https://php.net/}}, a scripting language that is often used in simple Web server applications \cite[p. 36]{Erb2012}. \textit{Twisted}\footnote{\url{https://twistedmatrix.com/}} is a reactor library for the \textit{Python}\footnote{\url{https://www.python.org/}} scripting language; its capabilities are similar to the \textit{EventMachine} library presented in section \ref{sec:eventmachine}. \textit{Java NIO}\footnote{Native Input and Output} (see section \ref{lab:stack}) is a general interface for non-blocking I/O operations that allows for creating asynchronous Web server applications.
 
 \section{Actor-based technologies}
 
 \subsection{Play!}
+\label{lab:play}
 \textit{Play!}\footnote{\url{http://www.playframework.com/}} is a full-stack Web application framework for development in \textit{Scala}\footnote{\url{http://www.scala-lang.org/}} and \textit{Java}. Since both languages are compiled to \textit{Java} bytecode and run on the \textit{Java} VM, both languages can be used side by side and libraries from the exhaustive \textit{Java} ecosystem can be included; as of version 2, the \textit{Play!} framework is written solely in \textit{Scala} \cite{Scala}. \textit{Play!} uses the \textit{Akka}\footnote{\url{http://akka.io/}} actor system, which is -- like the \textit{Scala} language and \textit{Play!} itself -- managed by \textit{Typesafe Inc.}\footnote{\url{https://typesafe.com/}}; all three products are available as an integrated environment called \textit{Activator}. 
 
 \subsubsection*{Development}
@@ -269,53 +271,58 @@ class Test {
 }  \end{JavaCode}\end{program}
 
 \subsubsection*{Scalability}
-dsf
+Scala -- even though its name being a portmanteau of the words \textit{scalable} and \textit{language} -- does not support scalable actor systems at language level. It only assumes the underlying host's thread model \cite[p. 3]{Haller2009}. The greater part of \textit{Play!}'s scalability is achieved by the \textit{Akka} actor system \cite[p. 16]{Gupta2012}. How exactly this system behaves depends on the runtime configuration, which is defined via configuration files. Actors are generally associated with a certain \textit{execution context}, i.e. a certain configuration of the actor system. In \textit{Akka}, there are two main types of execution contexts or \textit{executors}:
+\newpage
 
-\subsection{Lattice} \newpage a \newpage a
+\begin{description}
+  \item[Thread pool executor] Multiple worker threads are preallocated and incoming messages are distributed among free threads -- this minimises thread overhead
+  \item[Fork join executor] If the amount of work for single messages exceeds a certain size, the task can be split among multiple processing cores by creating (i.e. \textit{forking}) multiple instances of tasks that distribute work among them
+\end{description}
 
-vs rails
+Each execution context allows for configuring the minimum and maximum number of threads that are used as well as a multiplication factor that is based on the available cores. This allows for a very specific configuration of the actor system: If an execution context tends to dispatch many small tasks, the maximum number of threads can be increased, if there are few large tasks, fewer threads should be used \cite[p. 105]{Gupta2012}.
+
+There is also a number of different dispatcher types to choose from, depending on whether actors should share a mailbox and the order in which actors are handled. Furthermore, the behaviour of mailboxes upon exhaustion can also vary from neglecting new messages to not being sent new messages \cite[p. 104]{Gupta2012}. 
+
+All this configuration options account to the single-system scalability of \textit{Akka}. However, actors are not bound to reside on one single system. The means of communication between actors is not specified and can also be done using networking with remote systems. The default implementation of communication between different \textit{Akka} systems uses TCP and the \texttt{akka://} URL scheme. The orchestration of the entirety of actor subsystems is done by a master node system that handles message dispatching \cite[p. 233]{Gupta2012}. This way, \textit{Akka} can be scaled out to a large number of systems.
+
+\subsubsection*{Performance}
+\textit{Play!} internally uses the \textit{Netty}\footnote{\url{http://netty.io/}} HTTP server, which builds upon \textit{Java NIO} (see section \ref{lab:other-event}) to achieve non-blocking I/O capabilities \cite[p. 52]{Scala}. While \textit{Netty} has proven to be capable of serving more than 40000 requests per second\footnote{Tested on an \textit{Amazon EC2} cluster (\url{http://aws.amazon.com/ec2/})}, this on only pure network communication without Web-specific processing and I/O involved. The same request-based tests conducted on a \textit{Play!} application yield 9000 requests per second. Even with website-typical database operations and processing, a single \textit{Play!} application can serve 1350 to 2400 request per second \cite{Papauschek2013}. What is also noteworthy is that due to the adaptive nature of its actor system, \textit{Play!} delivers formidable performance even without the need for any application-level configuration.
+
+\subsection{Lattice}
+\textit{Lattice}\footnote{\url{https://github.com/celluloid/lattice}} is a lightweight Web framework for the \textit{Ruby} scripting language (see section \ref{sec:eventmachine}). It actually represents a combination of several different technologies that make up the entirety of the framework. \textit{Lattice} uses the \textit{Celluloid} actor system\footnote{\url{http://celluloid.io/}} for processing and builds upon the \textit{Reel}\footnote{\url{https://github.com/celluloid/reel}} Web server. On application level, it uses the \textit{Ruby} port of \textit{Webmachine}\footnote{\url{https://github.com/seancribbs/webmachine-ruby}} (originally written in \textit{Erlang}\footnote{\url{http://www.erlang.org/}}) to facilitate the handling of HTTP requests by mapping URL routes to respective controller methods. 
+
+\textit{Celluloid} actors can be created by simple including the \texttt{Celluloid} object inside a \textit{Ruby} class; see program \ref{prog:ruby-actors} for a detailed example \cite{Storimer2013}.
+\begin{program}  \caption{This program is an adaption of the actor example presented in program \label{prog:scala-actors} and demonstrates how to create actors with \textit{Celluloid}. By including the \texttt{Celluloid} object in a default \textit{Ruby} class body, actor functionality is added to the class (line 4). When creating an instance of this class, a new \textit{Celluloid} actor is initialised (line 18). To execute an asynchronous routine, the \texttt{async} method of the actor object has to be called, followed by the respecitve method name (line 22).}  \label{prog:ruby-actors}  \begin{JavaCode}
+
+class Mailer
+    
+    include Celluloid
+
+    def send_default_mail(email, content)
+        send_mail(...)
+    end
+
+    def send_image_mail(email, image)
+	    send_mail(...)
+    end
+
+end
+
+class Test
+
+    mailer = Mailer.new
+
+    def test()
+    
+        mailer.async.send_default_mail("john@doe.com, "Hello John")
+
+    end   
+
+end  \end{JavaCode}\end{program}
+When using the \texttt{async} method on an actor (as seen in program \ref{prog:ruby-actors}), no value is returned. However, using the \texttt{future} method returns a \texttt{Celluloid::Future} object, which represents a rather primitive promise (see section \ref{lab:nodehttp}). There is also an explicit way of creating promises by creating a new instance of the \texttt{Celluloid::Future} object with a block parameter containing the asynchronous logic. The only way to resolve a promise is to block current execution and wait for completion; there are no comprehensions like mapping or resolving multiple promises at once \cite{Arcieri2012}.
 
 \subsection{Others}
-Lift
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+Apart from the above frameworks, there are hardly any full-stack Web frameworks that use the actor concurrency model. \textit{Lift}\footnote{\url{http://liftweb.net/}} is another example of a \textit{Scala}-based actor-driven framework that is similar to \textit{Play!}. However, there is no option to develop applications in \textit{Java}, it does not offer versatile actor functionality compared to \textit{Akka} and the ecosystem (i.e. support by other developers) is not as advanced as with \textit{Play!}. \textit{Xitrum}\footnote{\url{http://xitrum-framework.github.io/}} is another \textit{Scala}- and \textit{Akka}-based Web framework that aims to offer functionality similar to \textit{Lift}. \textit{spray}\footnote{\url{http://spray.io}} is a lightweight general-purpose I/O framework also based on \textit{Scala} and \textit{Akka}. It offers a number of modules for extension, including \textit{spray-can} and \textit{spray-http}, which can be used to implement a low-level HTTP server.
 
 
 
