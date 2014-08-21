@@ -198,7 +198,7 @@ The fourth and last actor, is the \texttt{Feeder} actor. This is a standard acto
   \item{If a feed message arrives, the actor iterates over its client collection and identifies clients that have indicated interest in the message. The actor then sends relevant information (like which user has liked which picture) to the client over the \textit{WebSocket}.}
 \end{itemize}
 
-\section{Further Steps}
+\section{Deployment and Scaling}
 The described \textit{Play!} application can run on any platform that can execute \textit{Java} bytecode. Since it even includes its own Web server, it represents an integrated container that is readily suitable for deployment over multiple server instances. The present application is designed to use identical replications of actor systems on every system, the only means of sharing application state being the message passing via the \textit{Redis} server (see program \ref{prog:subscriber}). This means that the application can theoretically be scaled out indefinitely, provided a \textit{load balancer} serves incoming requests fast enough to the server instances and the database and cache communication happens at a formidable speed.
 
 A \textit{Play!} application could be scaled out in a different way: Instead of automated replications, the application could be designed using different modules on different systems that communicate via a central \textit{Akka} system. This way, a number of systems could handle network I/O and other systems could handle side effects or intensive computations like image processing.

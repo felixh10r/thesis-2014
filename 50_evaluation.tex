@@ -6,7 +6,7 @@ In the previous chapter, the implementation characteristics of an actor-based We
 
 Modern Web server performance can be defined by the system's behaviour when processing a high number of simultaneous requests. Ideally, the response time for each request should be as low as possible and should not increase significantly with the number of simultaneous requests. 
 
-To test the behaviour of thread-based applications side by side to event-based applications, tests should preferably be conducted under very similar conditions, the only major difference being asynchronous processing. Since in section \label{lab:lang} the \textit{Play!} framework was identified  as a feasible choice for demonstrating asynchronous processing in Web frameworks, \textit{Play!} is also used in the following performance tests. To achieve comparable performance, the thread-based contender application 
+To test the behaviour of thread-based applications side by side to event-based applications, tests should preferably be conducted under very similar conditions, the only major difference being asynchronous processing. Since in section \label{lab:lang} the \textit{Play!} framework was identified  as a feasible choice for demonstrating asynchronous processing in Web frameworks, \textit{Play!} is also used in the following performance tests. To achieve comparable performance, the thread-based contender application should ideally also be run on the \textit{Java} virtual machine (JVM). This leaves numerous choices; however, the \textit{Spring MVC}\footnote{\url{http://spring.io/}} framework is considered a similar solution regarding application structure and runtime behaviour \cite[p. 109]{Scala}.
 
 \section{Testing}
 
