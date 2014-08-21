@@ -3,7 +3,7 @@
 This chapter is a documentation of experiences gained during the creation of a concurrent high-performance Web application\footnote{At the time of writing, this Web application is live and already has several thousand users via Web and mobile clients. Unfortunately, due to corporate secrecy, the name of the application can not be disclosed.} -- from deciding on the programming language, the Web framework as well as supplementary technologies to developing, deploying and maintaining the actual application. Technical aspects (see chapter \ref{lab:technical}) as well as the current state of the art (see ) play a dominant role during the whole process; however, this chapter is not limited to applying previous content in practice, but rather uses it as a base for gaining contextual and more detailed knowledge about the topic.
 
 \section{Prerequisites}
-
+\label{sec:prerequitites}
 \subsection{Requirements}
 Depending on the projected success and behaviour of the application, the following requirements were decided on by the company:
 
@@ -17,6 +17,7 @@ Depending on the projected success and behaviour of the application, the followi
 Apart from these enterprise decisions, another requirements was added with respect to an interesting and innovative nature of the project: The application should make heavy use of event- or actor-driven programming paradigms.
 
 \subsection{Language and Framework}
+\label{lab:lang}
 The first and probably most important step in creating an application is to decide on a programming language and framework\footnote{Since these two elements depend on one another, deciding on a framework inherently limits the choice of languages.}. Research about modern event- or actor-driven frameworks yielded several possibilities, most of which are listed in chapter \ref{lab:sota}. Based on the extent of framework documentation, interoperability with other technologies and community size, the two final options were \textit{Node.js} and \textit{Play!}. 
 
 While \textit{Node.js} has the advantage of supporting a simple and widespread programming language that includes concurrency by design, \textit{Play!} appealed by supporting a type-safe, object-oriented language (either \textit{Java} or \textit{Scala}) with a solid set of libraries due to \textit{Java}'s history as a popular enterprise language. Furthermore, scaling on single systems is handled very differently by the two frameworks with \textit{Node.js} leveraging multiple process instances and \textit{Play!} using an actor system. Finally, \textit{Play!} was chosen due to the better application structure and the superior CPU utilisation (considered that there may be some minor image processing operations).
@@ -28,10 +29,10 @@ The present Web application features two kinds of data storage: A \textit{MongoD
 
 The only asynchronous \textit{MongoDB} driver at the time of writing was \textit{ReactiveMongo}\footnote{\url{http://reactivemongo.org/}}, a driver implementation written in \textit{Scala} that basically exposes the \textit{MongoDB} API\footnote{Application Programming Interface} to the application without any additional features like included \textit{DAO}\footnote{Data Access Object, a common feature in database drivers to simplify storage and retrieval of code objects in the database.} functionality. However, this enables a very flexible way of interacting with the database, which is especially suitable for atomic operations like increasing a single numeric value or deleting a property. \textit{ReactiveMongo} offers a \textit{Play!} plugin for easy integration with the framework (e.g. by managing connections according to application start/stop).
 
-For interfacing with the \textit{Redis} server, the \textit{rediscala}\footnote{\url{https://github.com/etaty/rediscala}} driver proved to be a good choice by offering non-blocking access to the most important server operations. \textit{rediscala} even offers dedicated actor superclasses designed for use with \textit{Akka}. On the downside, \textit{rediscala} does not provide a dedicated \textit{Play!} plugin, thus custom framework integration had to be implemented in order to use the driver.
+For interfacing with the \textit{Redis} server, the \textit{rediscala}\footnote{\url{https://github.com/etaty/rediscala}} driver proved to be a good choice by offering non-blocking access to the most important server operations. \textit{rediscala} even offers dedicated actor superclasses designed for use with \textit{Akka} (see section \ref{lab:news}). On the downside, \textit{rediscala} does not provide a dedicated \textit{Play!} plugin, thus custom framework integration had to be implemented in order to use the driver.
 
 The application also makes use of several other libraries, e.g. for sending emails. Here, a great advantage of \textit{Scala} comes 
-into play\footnote{No pun intended.}: Due to being compiled to \textit{Java} bytecode, \textit{Scala} is binary compatible with all available \textit{Java} libraries. For instance, the \textit{Apache Commons}\footnote{\url{http://commons.apache.org/}} email implementation written in \textit{Java} can also be used to send emails in \textit{Scala}.
+into play: Due to being compiled to \textit{Java} bytecode, \textit{Scala} is binary compatible with all available \textit{Java} libraries. For instance, the \textit{Apache Commons}\footnote{\url{http://commons.apache.org/}} email implementation written in \textit{Java} can also be used to send emails in \textit{Scala}.
 
 \section{Development}
 \label{lab:impl-dev}
@@ -102,70 +103,102 @@ Akka.system.schedule(Duration.Zero, 30.minutes)(renewAccessToken())
 
 \end{JavaCode}
 
-Technically, actors can also be used to defer program flow, but are generally used for more sophisticated operations; see section \ref{lab:explicit-actors} for detailed examples. 
+Technically, actors can also be used to defer program flow, but are generally used for more sophisticated operations (see section \ref{lab:explicit-actors}).
 
 \subsubsection*{Converting Blocking Code}
+Of course, not all operations return asynchronous results, especially when using third-party or \textit{Java} libraries. Wrapping blocking method calls in \texttt{Future} objects that can be resolved by \textit{Akka} is rather trivial:
+\begin{JavaCode}
+def asynchronousOperation(param: String): Future[String] = {
+    Future {
+        synchronousOperation(param)
+    }
+}
+\end{JavaCode}
 
-\subsection{Explicit Actor-based Operations}
+When resolving \texttt{Future} objects within a \textit{Play!} application, \textit{Play!}'s default dispatcher is used (for information about dispatchers see section \ref{lab:play}, \textit{Scalability}). However, especially for computationally expensive operations like image processing it is advisory to use a dedicated dispatcher. New dispatchers can be created by defining them in the \textit{Akka} configuration within \textit{Play!}'s configuration files:
+\begin{JavaCode}
+akka {
+    actor {
+        image-processing-dispatcher {
+            fork-join-executor {
+                parallelism-max = 2
+            }
+        }
+    }
+}
+\end{JavaCode}
+This defines a dispatcher called \texttt{image-processing-dispatcher} that uses a \textit{fork-join executor} and at most two threads in order not to block the application. Program \ref{prog:convert} gives an example of an expensive image processing operation converted to an asynchronous operation that can be deferred using a custom dispatcher.
+
+\begin{program}  \caption{This program shows how a comparably expensive image processing operation can be deferred using a custom dispatcher. In line 1, a reference to the custom dispatcher is created using \textit{Akka}'s lookup functionality. The \texttt{Future} block (line 5 to 19) wraps the expensive operation and defines the dispatcher that should be used to resolve the \texttt{Future} object (i.e. how it should be processed by the actor system). The operation itself (line 15) consists of a operating system call to the \textit{ImageMagick} (\url{http://www.imagemagick.org/}) command line tool. The \texttt{waitFor} method blocks the dedicated dispatcher thread until the processing has finished. After that, the \texttt{Future} object is resolved with a \texttt{File} reference to the generated image.}  \label{prog:convert}  \begin{JavaCode}
+val dispatcher = Akka.system.dispatchers.lookup("akka.actor.image-processing-dispatcher")
+
+def generateImage(filename: String): Future[File] = {
+
+    Future {
+
+        val cmd = Array(
+            "convert",
+            "-background", "black",
+            "-fill", "white",
+            ...
+            filename
+        )
+
+        Runtime.getRuntime.exec(cmd).waitFor()
+
+        new File(filename)
+    
+    } (dispatcher)
+    
+}  \end{JavaCode}\end{program}
+
+
+\subsection{Actor-based Operations}
 \label{lab:explicit-actors}
+Since \textit{Play!} does not expose the underlying actor structure to its libraries, application can be built without explicitly using any actors. However, the present application uses four actors for complex concurrency operations: The \texttt{Mailman} and \texttt{Notifier} actors are used to defer and isolate complex asynchronous operations, namely sending emails and mobile notifications, respectively. These two actors are structurally rather similar to the \texttt{Mailer} actor presented in program \ref{prog:scala-actors}, but include extensive logic to generate the different notifications depending on the received actor message. However, the \texttt{Feeder} and \texttt{Subscriber} actors are more complex and play an important role in section \ref{lab:news}.
 
-\subsection{Advanced Example: News Feed}
+\subsection{Advanced Actor Usage}
+\label{lab:news}
+The application also includes a news feed using a technology called \textit{Websockets} to send events to subscribed client applications over TCP. The basic idea is that when one user takes a specific action, other users that are interested in that action get notified instantly. A rather trivial approach would be to keep a collection of currently subscribed clients and notify them directly when a certain event occurs according to what events they have subscribed to. However, as defined in section \ref{sec:prerequitites}, \textit{Requirements}, the application should be scalable to multiple systems. This introduces a problem: Clients that subscribed on one particular system will not get events that occurred on other systems since the event is not propagated across all systems.
 
-\section{Deployment and Maintenance}
+The solution is to use a centralised messaging system. Options include dedicated protocols like \textit{AMQP}\footnote{Asynchronous Message Queuing Protocol}, but since the application already uses \textit{Redis}, which supports the \textit{Pub/Sub}\footnote{Publish-Subscribe} paradigm, using this system is more practicable. \textit{Pub/Sub} works by publishing messages to the central server, which forwards them to all systems who have subscribed to the corresponding message type.
 
+Publishing to the \textit{Redis} server can be easily done using the \textit{rediscala} library; for instance, the following line of code is used to publish a message when a user \texttt{abcd} likes a photo \texttt{1234}:
+\begin{JavaCode}
+RedisService.publish("/picture/1234/likes", "abcd")
+\end{JavaCode}
+Due to the side-effect nature of publishing a message, this may also be done using an actor. 
 
+Subscribing and receiving messages is the more complex part of the centralised message passing lifecycle. Ideally, incoming \textit{Redis} messages should be translated to \textit{Akka} messages for subsequent handling inside the actor system. Fortunately, \textit{rediscala} includes the \texttt{RedisSubscriberActor} superclass to facilitate subscribing to messages. Program \ref{prog:subscriber} shows how this subscriber actor class is structured and used.
 
+\begin{program}  \caption{This program shows, how the \texttt{RedisSubscriberActor} superclass can be used to create an actor class that listens for custom \textit{Redis} \texttt{publish} messages. Besides the publish channel, \textit{Redis} messages may include a pattern signature; messages are then only distributed to the subscibers that signify interest in the particular pattern. To be able to use the \texttt{RedisSubscriberActor} superclass, the subscriber actor has to supply two methods. The \texttt{onMessage} method is called when a message without a pattern arrives; however, because in this case only pattern messages are used, this message can return an empty object. The \texttt{onPMessage} method receives pattern messages and \textit{tells} the \texttt{Feeder} actor to send the message to the currently connected clients. The subscriber actor has to be initialised upon application start; this can be done using \textit{Play!}'s \texttt{Global} object, which can override the \texttt{onStart} method (line 15). Inside the \texttt{onStart} method, the subscriber actor is created using the \texttt{Props} object, which creates a new class instance using specified constructor parameters. The second parameter, \texttt{Nil}, indicates, that the subscriber should not listen to a particular channel; the third parameter is a sequence of patterns consisting of one pattern that matches likes for any picture. Note that this actor uses \textit{rediscala}'s own dispatcher.}  \label{prog:subscriber}  \begin{JavaCode}
+class Subscriber(channels: Seq[String] = Nil, patterns: Seq[String] = Nil) extends RedisSubscriberActor(Redis.socket, channels, patterns, Redis.password) {
 
+    def onMessage(message: Message) {
+        Nil
+    }
 
+    def onPMessage(message: PMessage) {
+        Feeder.push((message.channel, message.data))
+    }
 
+}
 
+object Global {
 
+    override def onStart(app: Application) = {
+        Akka.system.actorOf(Props(classOf[Subscriber], Nil, Seq("/picture/*/likes")).withDispatcher("rediscala.rediscala-client-worker-dispatcher"))
+    }
 
+}  \end{JavaCode}\end{program}
 
+The fourth and last actor, is the \texttt{Feeder} actor. This is a standard actor that listens for two types of messages:
+\begin{itemize}
+  \item{If a client connects to the application via \textit{Play!}'s \texttt{WebSocket.tryAccept} controller action, the actor receives a message containing the desired feed (e.g. \texttt{/picture/1234/likes}) and a reference handle to the client. The actor then stores the client inside a collection.}
+  \item{If a feed message arrives, the actor iterates over its client collection and identifies clients that have indicated interest in the message. The actor then sends relevant information (like which user has liked which picture) to the client over the \textit{WebSocket}.}
+\end{itemize}
 
+\section{Further Steps}
+The described \textit{Play!} application can run on any platform that can execute \textit{Java} bytecode. Since it even includes its own Web server, it represents an integrated container that is readily suitable for deployment over multiple server instances. The present application is designed to use identical replications of actor systems on every system, the only means of sharing application state being the message passing via the \textit{Redis} server (see program \ref{prog:subscriber}). This means that the application can theoretically be scaled out indefinitely, provided a \textit{load balancer} serves incoming requests fast enough to the server instances and the database and cache communication happens at a formidable speed.
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+A \textit{Play!} application could be scaled out in a different way: Instead of automated replications, the application could be designed using different modules on different systems that communicate via a central \textit{Akka} system. This way, a number of systems could handle network I/O and other systems could handle side effects or intensive computations like image processing.
