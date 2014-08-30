@@ -1,6 +1,6 @@
 \chapter{Implementation}
 \label{sec:impl}
-This chapter is a documentation of experiences gained during the creation of a concurrent high-performance Web application\footnote{At the time of writing, this Web application is live and already has several thousand users via Web and mobile clients. Unfortunately, due to corporate secrecy, the name of the application can not be disclosed.} -- from deciding on the programming language, the Web framework as well as supplementary technologies to developing, deploying and maintaining the actual application. Technical aspects (see chapter \ref{lab:technical}) as well as the current state of the art (see ) play a dominant role during the whole process; however, this chapter is not limited to applying previous content in practice, but rather uses it as a base for gaining contextual and more detailed knowledge about the topic.
+This chapter is a documentation of experiences gained during the creation of a concurrent high-performance Web application\footnote{At the time of writing, this Web application is live and already has several thousand users via Web and mobile clients. Unfortunately, due to corporate secrecy, the name of the application can not be disclosed.} -- from deciding on the programming language, the Web framework as well as supplementary technologies to developing, deploying and maintaining the actual application. Technical aspects (see chapter \ref{lab:technical}) as well as the current state of the art (see chapter \ref{lab:sota}) play a dominant role during the whole process; however, this chapter is not limited to applying previous content in practice, but rather uses it as a base for gaining contextual and more detailed knowledge about the topic.
 
 \section{Prerequisites}
 \label{sec:prerequitites}
@@ -172,8 +172,8 @@ Due to the side-effect nature of publishing a message, this may also be done usi
 Subscribing and receiving messages is the more complex part of the centralised message passing lifecycle. Ideally, incoming \textit{Redis} messages should be translated to \textit{Akka} messages for subsequent handling inside the actor system. Fortunately, \textit{rediscala} includes the \texttt{RedisSubscriberActor} superclass to facilitate subscribing to messages. Program \ref{prog:subscriber} shows how this subscriber actor class is structured and used.
 
 \begin{program}  \caption{This program shows, how the \texttt{RedisSubscriberActor} superclass can be used to create an actor class that listens for custom \textit{Redis} \texttt{publish} messages. Besides the publish channel, \textit{Redis} messages may include a pattern signature; messages are then only distributed to the subscibers that signify interest in the particular pattern. To be able to use the \texttt{RedisSubscriberActor} superclass, the subscriber actor has to supply two methods. The \texttt{onMessage} method is called when a message without a pattern arrives; however, because in this case only pattern messages are used, this message can return an empty object. The \texttt{onPMessage} method receives pattern messages and \textit{tells} the \texttt{Feeder} actor to send the message to the currently connected clients. The subscriber actor has to be initialised upon application start; this can be done using \textit{Play!}'s \texttt{Global} object, which can override the \texttt{onStart} method (line 15). Inside the \texttt{onStart} method, the subscriber actor is created using the \texttt{Props} object, which creates a new class instance using specified constructor parameters. The second parameter, \texttt{Nil}, indicates, that the subscriber should not listen to a particular channel; the third parameter is a sequence of patterns consisting of one pattern that matches likes for any picture. Note that this actor uses \textit{rediscala}'s own dispatcher.}  \label{prog:subscriber}  \begin{JavaCode}
-class Subscriber(channels: Seq[String] = Nil, patterns: Seq[String] = Nil) extends RedisSubscriberActor(Redis.socket, channels, patterns, Redis.password) {
-
+class Subscriber(channels: Seq[String] = Nil, patterns: Seq[String] = Nil) extends RedisSubscriberActor(Redis.socket, channels, patterns, Redis.password) { 
+ 
     def onMessage(message: Message) {
         Nil
     }
@@ -186,13 +186,13 @@ class Subscriber(channels: Seq[String] = Nil, patterns: Seq[String] = Nil) exten
 
 object Global {
 
-    override def onStart(app: Application) = {
+    override def onStart(app: Application) = { 
         Akka.system.actorOf(Props(classOf[Subscriber], Nil, Seq("/picture/*/likes")).withDispatcher("rediscala.rediscala-client-worker-dispatcher"))
     }
 
 }  \end{JavaCode}\end{program}
 
-The fourth and last actor, is the \texttt{Feeder} actor. This is a standard actor that listens for two types of messages:
+The fourth and last actor, is the \texttt{Feeder} actor. This is a standard actor that listens for two types of messages: 
 \begin{itemize}
   \item{If a client connects to the application via \textit{Play!}'s \texttt{WebSocket.tryAccept} controller action, the actor receives a message containing the desired feed (e.g. \texttt{/picture/1234/likes}) and a reference handle to the client. The actor then stores the client inside a collection.}
   \item{If a feed message arrives, the actor iterates over its client collection and identifies clients that have indicated interest in the message. The actor then sends relevant information (like which user has liked which picture) to the client over the \textit{WebSocket}.}
