@@ -115,7 +115,8 @@ def asynchronousOperation(param: String): Future[String] = {
 }
 \end{JavaCode}
 
-When resolving \texttt{Future} objects within a \textit{Play!} application, \textit{Play!}'s default dispatcher is used (for information about dispatchers see section \ref{lab:play}, \textit{Scalability}). However, especially for computationally expensive operations like image processing it is advisory to use a dedicated dispatcher. New dispatchers can be created by defining them in the \textit{Akka} configuration within \textit{Play!}'s configuration files:
+When resolving \texttt{Future} objects within a \textit{Play!} application, \textit{Play!}'s default dispatcher is used (for information about dispatchers see section \ref{lab:play}, \textit{Scalability}). However, especially for computationally expensive operations like image processing it is advisory to use a dedicated dispatcher. New dispatchers can be created by defining them in the \textit{Akka} configuration within \textit{Play!}'s configuration files (see program \ref{prog:customdispatcher}).
+\begin{program}  \caption{This configuration statement defines a custom dispatcher called \texttt{image-processing-dispatcher} that uses a \textit{fork-join executor} and at most two threads in order not to block the application.}  \label{prog:customdispatcher}
 \begin{JavaCode}
 akka {
     actor {
@@ -127,7 +128,8 @@ akka {
     }
 }
 \end{JavaCode}
-This defines a dispatcher called \texttt{image-processing-dispatcher} that uses a \textit{fork-join executor} and at most two threads in order not to block the application. Program \ref{prog:convert} gives an example of an expensive image processing operation converted to an asynchronous operation that can be deferred using a custom dispatcher. At the beginning of the code example, a reference to the custom dispatcher is created using \textit{Akka}'s lookup functionality. The \texttt{Future} block wraps the expensive operation and defines the dispatcher that should be used to resolve the \texttt{Future} object (i.e. how it should be processed by the actor system). The operation itself consists of a operating system call to a image processing command line tool. The \texttt{waitFor} method blocks the dedicated dispatcher thread until the processing has finished. After that, the \texttt{Future} object is resolved with a \texttt{File} reference to the generated image.
+\end{program}
+Program \ref{prog:convert} gives an example of an expensive image processing operation converted to an asynchronous operation that can be deferred using a custom dispatcher. At the beginning of the code example, a reference to the custom dispatcher is created using \textit{Akka}'s lookup functionality. The \texttt{Future} block wraps the expensive operation and defines the dispatcher that should be used to resolve the \texttt{Future} object (i.e. how it should be processed by the actor system). The operation itself consists of a operating system call to a image processing command line tool. The \texttt{waitFor} method blocks the dedicated dispatcher thread until the processing has finished. After that, the \texttt{Future} object is resolved with a \texttt{File} reference to the generated image.
 
 \begin{program}  \caption{This program shows how a comparably expensive image processing operation can be deferred using a custom dispatcher.}  \label{prog:convert}  \begin{JavaCode}
 val dispatcher = Akka.system.dispatchers.lookup("akka.actor.image-processing-dispatcher")

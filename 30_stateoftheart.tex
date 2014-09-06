@@ -9,7 +9,7 @@ On the other hand, modern Web frameworks often include ways of abstracting concu
 \setlength{\tabcolsep}{0mm}
   \includegraphics[width=.90\textwidth]{full_stack}
 \caption{
-A Web framework aims to facilitate development by including frequently used capabilities. Image based on the structure of the \textit{Play! Framework} (\url{http://www.playframework.com}) \cite{Scala}
+A Web framework aims to facilitate development by including frequently used capabilities. Image based on the structure of the \textit{Play! Framework} \cite{Scala}
 }
 \label{fig:full_stack}
 \end{figure}
@@ -266,7 +266,6 @@ class Test {
 
 \subsubsection*{Scalability}
 Scala -- even though its name being a portmanteau of the words \textit{scalable} and \textit{language} -- does not support scalable actor systems at language level. It only makes assumptions about the underlying host's thread model \cite[p. 3]{Haller2009}. The majority of \textit{Play!}'s scalability is due to the included \textit{Akka} actor system \cite[p. 16]{Gupta2012}. How exactly this system behaves depends on the runtime configuration, which is defined via configuration files. Actors are generally associated with a certain \textit{execution context}, i.e. a certain configuration of the actor system. In \textit{Akka}, there are two main types of execution contexts or \textit{executors}:
-\newpage
 
 \begin{description}
   \item[Thread pool executor] Multiple worker threads are preallocated and incoming messages are distributed among free threads -- this minimises thread overhead
@@ -287,7 +286,7 @@ All these configuration options account to the single-system scalability of \tex
  
 Program \ref{prog:ruby-actors} demonstrates how to create actors with \textit{Celluloid}. By including the \texttt{Celluloid} object in a default \textit{Ruby} class body, actor functionality is added to the class. When creating an instance of this class, a new \textit{Celluloid} actor is initialised. To execute an asynchronous routine, the \texttt{async} method of the actor object has to be called, followed by the respective method name.
 
-\begin{program}  \caption{This program is an adaption of the actor example presented in program \label{prog:scala-actors}. \textit{Celluloid} actors can be created by simple including the \texttt{Celluloid} object inside a \textit{Ruby} class.}  \label{prog:ruby-actors}  \begin{JavaCode}
+\begin{program}  \caption{This program is an adaption of the actor example presented in program \ref{prog:scala-actors}. \textit{Celluloid} actors can be created by simple including the \texttt{Celluloid} object inside a \textit{Ruby} class.}  \label{prog:ruby-actors}  \begin{JavaCode}
 
 class Mailer
     
