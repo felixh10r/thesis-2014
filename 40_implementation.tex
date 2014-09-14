@@ -1,6 +1,6 @@
 \chapter{Implementation}
 \label{sec:impl}
-This chapter is a documentation of experiences and remarks during the creation of a concurrent high-performance Web application\footnote{At the time of writing, this Web application is live and already has several thousand users via the Web and mobile clients. However, due to corporate secrecy, the name of the application will not be disclosed here.} -- from deciding on the programming language, the Web framework as well as supplementary technologies to developing, deploying and maintaining the actual application. Technical aspects (see chapter \ref{lab:technical}) as well as the current state of the art (see chapter \ref{lab:sota}) play a dominant role during the whole process; however, this chapter is not limited to applying previous content in practice, but rather uses it as a base for gaining additional and more detailed knowledge about the topic.
+This chapter is a documentation of experiences and remarks during the creation of a concurrent high-performance Web application\footnote{At the time of writing, this Web application is live and already has several thousand users via the Web and mobile clients. However, due to corporate secrecy, the name of the application will not be disclosed here.} -- from deciding on the programming language, the Web framework as well as supplementary technologies to developing, deploying and maintaining the actual application. Results are used to gain additional and more detailed knowledge about the topic.
 
 \section{Prerequisites}
 \label{sec:prerequitites}
@@ -14,46 +14,53 @@ Depending on the projected success and behaviour of the application, the followi
   \item{Since the success of the application can not be predicted, a high scaling range -- also using multiple servers -- is necessary.}
 \end{itemize}
 
-Apart from these enterprise decisions, another requirement was added with respect to an interesting and innovative nature of the project: The application should make heavy use of event- or actor-driven programming paradigms.
+In order to efficiently process the countless atomic operations that are implied by a social network applications -- like interactions between users -- as well as the communication to third-party Web services, event- or actor-driven programming paradigms should be heavily used throughout the application.
 
 \subsection{Language and Framework}
 \label{lab:lang}
 The first and probably most important step in creating an application is to decide on a programming language and framework\footnote{Since these two elements depend on one another, deciding on a framework inherently limits the choice of languages.}. Research about modern event- or actor-driven frameworks yielded several possibilities, most of which are listed in chapter \ref{lab:sota}. Based on the extent of framework documentation, interoperability with other technologies and community size, the two final options were \textit{Node.js} and \textit{Play!}. 
 
-While \textit{Node.js} has the advantage of supporting a simple and widespread programming language that includes concurrency by design, \textit{Play!} appealed by supporting a type-safe, object-oriented language (either \textit{Java} or \textit{Scala}) with a solid set of libraries due to \textit{Java}'s history as a popular enterprise language. Furthermore, scaling on single systems is handled very differently by the two frameworks with \textit{Node.js} leveraging multiple process instances and \textit{Play!} using an actor system. Finally, \textit{Play!} was chosen due to the better application structure and the superior CPU utilisation (considered that there may be some minor image processing operations).
+While \textit{Node.js} has the advantage of supporting a simple and widespread programming language and includes a high-performance event-loop, \textit{Play!} appealed by supporting a type-safe, object-oriented language (either \textit{Java} or \textit{Scala}) with a solid set of libraries due to \textit{Java}'s history as a popular enterprise language. Furthermore, scaling on single systems is handled very differently by the two frameworks with \textit{Node.js} leveraging multiple process instances and \textit{Play!} using an actor system. Finally, \textit{Play!} was chosen due to the better application structure and the superior CPU utilisation (considered that there may be some minor image processing operations).
 
-This leaves two choices of language: \textit{Java} and \textit{Scala}. Even though \textit{Scala} is not as widespread as \textit{Java} -- which may result in difficulties finding developers in later stages of the project -- it offers various advanced features including syntax simplifications and library-level functionality for concurrent operations, option data types and number ranges as well as a purely object-oriented structure\footnote{\textit{Java} has an inconsistent type system with types like \texttt{int} or \texttt{boolean} not being part of the global object hierarchy.}. 
+This left two choices of language: \textit{Java} and \textit{Scala}. Even though \textit{Scala} is not as widespread as \textit{Java} -- which may result in difficulties finding developers in later stages of the project -- it offers various advanced features including syntax simplifications and library-level functionality for concurrent operations, option data types and number ranges as well as a purely object-oriented structure\footnote{\textit{Java} has an inconsistent type system with types like \texttt{int} or \texttt{boolean} not being part of the global object hierarchy.}. 
 
 \subsection{Drivers and Libraries}
-The present Web application features two kinds of data storage: A \textit{MongoDB}\footnote{\url{http://www.mongodb.org/}} database is used for persisting any long-lived information and a \textit{Redis}\footnote{\url{http://redis.io/}} key-value store is used for short-lived information like caching as well as for pub-sub communication (details follow in section \ref{lab:impl-dev}). Both components are accessed as \textit{SaaS}\footnote{Software as a Service, third-party companies that offer provision and maintenance of software on their own servers.} due to simple deployment and maintenance. A number of different drivers expose libraries to facilitate communication with these technologies; unfortunately, currently only few drivers that support asynchronous non-blocking I/O. Using blocking data access drivers with \textit{Play!} would eliminate most of the performance gains achieved by \textit{Play!}'s non-blocking I/O due to the occupation of processing threads. 
+The present Web application features two kinds of data storage: A \textit{MongoDB}\footnote{\url{http://www.mongodb.org/}} database is used for persisting any long-lived information and a \textit{Redis}\footnote{\url{http://redis.io/}} key-value store is used for short-lived information like caching as well as for pub-sub communication (details follow in section \ref{lab:impl-dev}). Both components are accessed as \textit{SaaS}\footnote{Software as a Service, third-party companies that offer provision and maintenance of software on their own servers.} due to simple deployment and maintenance. A number of different drivers expose libraries to facilitate communication with these technologies; unfortunately, currently only few drivers support asynchronous non-blocking I/O. Using blocking data access drivers with \textit{Play!} would eliminate most of the performance gains achieved by \textit{Play!}'s non-blocking I/O due to the occupation of processing threads. 
 
-The only asynchronous \textit{MongoDB} driver at the time of writing was \textit{ReactiveMongo}\footnote{\url{http://reactivemongo.org/}}, a driver implementation written in \textit{Scala} that basically exposes the \textit{MongoDB} API\footnote{Application Programming Interface} to the application without any additional features like included \textit{DAO}\footnote{Data Access Object, a common feature in database drivers to simplify storage and retrieval of code objects in the database.} functionality. However, this enables a very flexible way of interacting with the database, which is especially suitable for atomic operations like increasing a single numeric value or deleting a property. \textit{ReactiveMongo} offers a \textit{Play!} plugin for easy integration with the framework (e.g. by managing connections according to application start/stop).
+The only asynchronous \textit{MongoDB} driver at the time of writing was \textit{ReactiveMongo}\footnote{\url{http://reactivemongo.org/}}, a driver implementation written in \textit{Scala} that basically exposes the \textit{MongoDB} API to the application without any additional features like included \textit{DAO}\footnote{Data Access Object, a pattern used by database libraries to simplify storage and retrieval of code objects in the database.} functionality. However, this enables a very flexible way of interacting with the database, which is especially suitable for atomic operations like increasing a single numeric value or deleting a property. \textit{ReactiveMongo} offers a \textit{Play!} plugin for easy integration with the framework (e.g. by managing connections according to application start/stop).
 
-For interfacing with the \textit{Redis} server, the \textit{rediscala}\footnote{\url{https://github.com/etaty/rediscala}} driver proved to be a good choice by offering non-blocking access to the most important server operations. \textit{rediscala} even offers dedicated actor superclasses designed for use with \textit{Akka} (see section \ref{lab:news}). On the downside, \textit{rediscala} does not provide a dedicated \textit{Play!} plugin, thus custom framework integration had to be implemented in order to use the driver.
+For interfacing with the \textit{Redis} server, the \textit{rediscala}\footnote{\url{https://github.com/etaty/rediscala}} driver proved to be a good choice by offering non-blocking access to the most important server operations. \textit{rediscala} even offers dedicated actor superclasses designed for use with \textit{Akka} (see section \ref{lab:news}). On the downside, \textit{rediscala} does not provide a dedicated \textit{Play!} plugin, thus custom framework integration had to be implemented in order to use the driver. A diagram of the used technologies can be seen in figure \ref{fig:project}.
+
+\begin{figure}
+\centering\small
+\setlength{\tabcolsep}{0mm}
+  \includegraphics[width=.80\textwidth]{project}
+\caption{
+The final project setup that resulted from the preceding considerations. Note that client requests are distributed among server instances by the server system, but every server instance connects to the database and cache individually.
+}
+\label{fig:project}
+\end{figure}
 
 The application also makes use of several other libraries, e.g. for sending emails. Here, a great advantage of \textit{Scala} comes 
-into play: Due to being compiled to \textit{Java} bytecode, \textit{Scala} is binary compatible with all available \textit{Java} libraries. For instance, the \textit{Apache Commons}\footnote{\url{http://commons.apache.org/}} email implementation written in \textit{Java} can also be used to send emails in \textit{Scala}.
+into play: Due to being compiled to \textit{Java} bytecode, \textit{Scala} is binary compatible with all available \textit{Java} libraries. For instance, the \textit{Apache Commons}\footnote{\url{http://commons.apache.org/}} email implementation written in \textit{Java} can also be used to send emails in \textit{Scala}\footnote{Blocking \textit{Java} functions can also be wrapped with \textit{Futures} (see section \ref{lab:play} and section \ref{lab:basicasync}, \textit{Converting Blocking Code}) in order to create non-blocking, actor-based \textit{Scala} functions.}.
 
 \section{Development}
 \label{lab:impl-dev}
+
+This section describes how actor-driven patterns were used to realise relevant parts of a Web server application with respect to the prerequisites defined in the last section.
+
 \subsection{Requests and Actions}
 As already mentioned in section \ref{lab:play}, \textit{Play!} uses different controller actions to determine if a request should be served synchronously or asynchronously (see program \ref{prog:scala-actions1} and \ref{prog:scala-actions2}, respectively). A good example for a synchronous request is an action that returns the current server time for the request signing procedure\footnote{Requests are only valid for a certain timespan to prevent \textit{replay attacks}, i.e. capturing and sending a request multiple times.}. Here, no database action is necessary and the retrieval of system time does not consume much processing time. However, nearly all requests to the Web server involve some kind of database operation; either resources are read or written or a combination of multiple operations is executed. When writing a value to the database, the response is served after the operation completes to indicate success or failure to the client; this way, the client can decide for itself whether it waits for the response or, for instance, updates the user interface right after sending the request.
 
 \subsection{Basic Asynchronous Operations}
-\subsubsection*{Working With Futures}
-The majority of asynchronous operations involve database or cache access. The database driver and the cache driver both return \texttt{Future} objects, i.e. the respective calls return almost instantaneously and yield a value that is resolved later (cf. program \ref{prog:scala-actions2}). In the simplest case, this value can be mapped to a \texttt{Result} object and returned by an asynchronous action. However, this is not always the case; frequently, the returned value has to be processed and results are even used as parameters for new database operations. Program \ref{prog:multimap} shows an example with two nested \texttt{Future} resolutions. A typical occurrence of two database operations is for instance when a new user should be created with a unique username. The outmost block is the default asynchronous \texttt{Action} block with a \textit{body parser} as argument. This body parser converts the text from the request body into a JSON (JavaScript Object Notation, commonly used for HTTP communication) object suitable for further processing. This body must contain a desired username, which is obtained by traversing the JSON abstract syntax tree (using the \textbackslash{} method). Next, a database query is initiated using the provided username. This query returns a \texttt{Future[Option[User]]} object; the \texttt{Option} type indicates that the value can either be present (\texttt{Some}) or absent (\texttt{None}). The \texttt{flatMap} method is similar to the \texttt{map} method, but instead of \texttt{Result} objects, all statements inside the block must return \texttt{Future[Result]} objects. If the database query returns an object of the type \texttt{None}, no user with the given username is found and thus the new user can be inserted and the result of the database operation can be mapped to a \texttt{Result} using \texttt{map}. However, if the username already exists, no subsequent database operation has to be initiated and the response can be sent instantly. To generate a readily resolved \texttt{Future}, the \texttt{Future.successful} method can be used.
+\label{lab:basicasync}
 
-\begin{program}  \caption{In this example, two images are uploaded to a remote server. Only when both uploads have completed, the response should be sent containing the URLs oft both images. The \texttt{for} comprehension receives a block with multiple \texttt{Future[String]} assignments. The \texttt{yield} statement wraps these \texttt{Future} objects in a single \texttt{Future[(String, String)]} object. This is a type called a \textit{tuple}, i.e. two objects combined into one. The \texttt{map} comprehension in line 4 maps this \texttt{Future} to a simple tuple, the values of which can be retrieved using the \texttt{.\_1} and \texttt{\_.2} properties (line 6).}  \label{prog:for}
-\begin{JavaCode}
-(for {
-    picture1Url <- uploadPicture(picture1)
-    picture2Url <- uploadPicture(picture2)
-} yield (picture1Url, picture2Url)) map {
-    result =>
-        Ok("Here are your pictures:\n" + result._1 + "\n" + result._2)
-}
-\end{JavaCode}
-\end{program}
+
+
+\subsubsection*{Working With Futures}
+The majority of asynchronous operations involve database or cache access. The database driver and the cache driver both return \texttt{Future} objects, i.e. the respective calls return almost instantaneously and yield a value that is resolved later (cf. program \ref{prog:scala-actions2}). In the simplest case, this value can be mapped to a \texttt{Result} object and returned by an asynchronous action. However, this is not always the case; frequently, the returned value has to be processed and results are even used as parameters for new database operations. Program \ref{prog:multimap} shows an example with two nested \texttt{Future} resolutions: 
+
+A typical occurrence of two database operations is for instance when a new user should be created with a unique username. The outmost block is the default asynchronous \texttt{Action} block with a \textit{body parser} as argument. This body parser converts the text from the request body into a JSON  object\footnote{JavaScript Object Notation, commonly used for HTTP communication, \url{http://json.org/}} suitable for further processing. This body must contain a desired username, which is obtained by traversing the JSON abstract syntax tree (using the \textbackslash{} method). Next, a database query is initiated using the provided username. This query returns a \texttt{Future[Option[User]]} object; the \texttt{Option} type indicates that the value can either be present (\texttt{Some}) or absent (\texttt{None}). The \texttt{flatMap} method is similar to the \texttt{map} method, but instead of \texttt{Result} objects, all statements inside the block must return \texttt{Future[Result]} objects. If the database query returns an object of the type \texttt{None}, no user with the given username is found and thus the new user can be inserted and the result of the database operation can be mapped to a \texttt{Result} using \texttt{map}. However, if the username already exists, no subsequent database operation has to be initiated and the response can be sent instantly. To generate a readily resolved \texttt{Future}, the \texttt{Future.successful} method can be used.
 
 \begin{program}  \caption{This is a basic example of how two database operations can be nested in a \textit{Play!} application. \texttt{Created}, \texttt{Conflict} and \texttt{InternalServerError} are helpers for the response status codes \texttt{201}, \texttt{409} and \texttt{500}, respectively.}  \label{prog:multimap}  \begin{JavaCode}
 def insertUniqueUser() = Action.async(parse.json) {
@@ -71,6 +78,18 @@ def insertUniqueUser() = Action.async(parse.json) {
                 Future.successful(Conflict("Username exists!"))
         }
 }  \end{JavaCode}\end{program}
+
+\begin{program}  \caption{In this example, two images are uploaded to a remote server. Only when both uploads have completed, the response should be sent containing the URLs oft both images. The \texttt{for} comprehension receives a block with multiple \texttt{Future[String]} assignments. The \texttt{yield} statement wraps these \texttt{Future} objects in a single \texttt{Future[(String, String)]} object. This is a type called a \textit{tuple}, i.e. two objects combined into one. The \texttt{map} comprehension in line 4 maps this \texttt{Future} to a simple tuple, the values of which can be retrieved using the \texttt{.\_1} and \texttt{\_.2} properties (line 6).}  \label{prog:for}
+\begin{JavaCode}
+(for {
+    picture1Url <- uploadPicture(picture1)
+    picture2Url <- uploadPicture(picture2)
+} yield (picture1Url, picture2Url)) map {
+    result =>
+        Ok("Here are your pictures:\n" + result._1 + "\n" + result._2)
+}
+\end{JavaCode}
+\end{program}
 
 To resolve multiple \texttt{Future} objects in parallel and work with the combined results of the single asynchronous operations, the \texttt{for} comprehension can be used; see program \ref{prog:for} for an example.
 
@@ -171,7 +190,7 @@ RedisService.publish("/picture/1234/likes", "abcd")
 \end{JavaCode}
 Due to the side-effect nature of publishing a message, this may also be done using an actor. 
 
-Subscribing and receiving messages is the more complex part of the centralised message passing lifecycle. Ideally, incoming \textit{Redis} messages should be translated to \textit{Akka} messages for subsequent handling inside the actor system. Fortunately, \textit{rediscala} includes the \texttt{RedisSubscriberActor} superclass to facilitate subscribing to messages. Program \ref{prog:subscriber} shows how this subscriber actor class is structured and used to receive custom \textit{Redis} \texttt{publish} messages. Besides the publish channel, \textit{Redis} messages may include a pattern signature; messages are then only distributed to the subscribers that signify interest in the particular pattern. To be able to use the \texttt{RedisSubscriberActor} superclass, the subscriber actor has to supply two methods. The \texttt{onMessage} method is called when a message without a pattern arrives; however, because in this case only pattern messages are used, this message can return an empty object. The \texttt{onPMessage} method receives pattern messages and \textit{tells} the \texttt{Feeder} actor to send the message to the currently connected clients. The subscriber actor has to be initialised upon application start; this can be done using \textit{Play!}'s \texttt{Global} object, which can override the \texttt{onStart} method. Inside the \texttt{onStart} method, the subscriber actor is created using the \texttt{Props} object, which creates a new class instance using specified constructor parameters. The second parameter, \texttt{Nil}, indicates, that the subscriber should not listen to a particular channel; the third parameter is a sequence of patterns consisting of one pattern that matches likes for any picture. Note that this actor uses \textit{rediscala}'s own dispatcher.
+Subscribing and receiving messages is the more complex part of the centralised message passing lifecycle. Ideally, incoming \textit{Redis} messages should be translated to \textit{Akka} messages for subsequent handling inside the actor system. Fortunately, \textit{rediscala} includes the \texttt{RedisSubscriberActor} superclass to facilitate subscribing to messages. Program \ref{prog:subscriber} shows how this subscriber actor class is structured and used to receive custom \textit{Redis} \texttt{publish} messages. Besides the publish channel, \textit{Redis} messages may include a pattern signature; messages are then only distributed to the subscribers that signify interest in the particular pattern. To be able to use the \texttt{RedisSubscriberActor} superclass, the subscriber actor has to supply two methods. The \texttt{onMessage} method is called when a message without a pattern arrives; however, because in this case only pattern messages are used, this message can return an empty object. The \texttt{onPMessage} method receives pattern messages and \textit{tells} the \texttt{Feeder} actor to send the message to the currently connected clients. The subscriber actor has to be initialised upon application start; this can be done using \textit{Play!}'s \texttt{Global} object, which can override the \texttt{onStart} method. Inside the \texttt{onStart} method, the subscriber actor is created using the \texttt{Props} object, which creates a new class instance using specified constructor parameters. The second parameter, \texttt{Nil}, indicates, that the subscriber should not listen to a particular channel; the third parameter is a sequence of patterns consisting of one pattern that matches likes for any picture. Note that this actor uses \textit{rediscala}'s own dispatcher. A diagram of how information flow happens within the setup can be seen in figure \ref{fig:subscribe}.
 
 \begin{program}  \caption{This program shows how the \texttt{RedisSubscriberActor} superclass can be used to create an actor class that listens for custom \textit{Redis} \texttt{publish} messages.}  \label{prog:subscriber}  \begin{JavaCode}
 class Subscriber(channels: Seq[String] = Nil, patterns: Seq[String] = Nil) extends RedisSubscriberActor(Redis.socket, channels, patterns, Redis.password) { 
@@ -193,6 +212,17 @@ object Global {
     }
 
 }  \end{JavaCode}\end{program}
+
+\begin{figure}
+\centering\small
+\setlength{\tabcolsep}{0mm}
+  \includegraphics[width=.80\textwidth]{subscribe}
+\caption{
+Schematic information flow between systems and clients. Client A triggers an event, e.g. likes a picture, which concerns the other three clients. The event is processed by server A, which sends the information directly to all connected clients. Server A \textit{publishes} the event also to the central \textit{Redis} server, which propagates it to all subscribed servers. Server B then sends the received information on to all connected clients.
+}
+\label{fig:subscribe}
+\end{figure}
+
 
 The fourth and last actor, is the \texttt{Feeder} actor. This is a standard actor that listens for two types of messages: 
 \begin{itemize}
