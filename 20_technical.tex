@@ -241,14 +241,14 @@ Illustration of an actor-based control flow. Actors are represented as circles a
 \label{fig:actor_flow}
 \end{figure}
 
-Incoming messages are handled via \textit{mailboxes}, which are basically actor-specific queues that receive, filter and defer incoming messages. Like in event-based architectures, there is no guarantee in which order messages arrive in the mailbox and---since the actor model does not specify a medium for passing messages (which may also be network-based, see below), a message can take arbitrarily long to reach its destination \cite[97]{Erb2012}. Since only the corresponding actor can access his mailbox and only one message is processed at a time, no concurrency issues---like race conditions---can arise for the actor state and the mailbox as well as in between messages \cite[p. 12]{Eriksson2013}. The orchestration of message processing is done by a \textit{dispatcher}, i.e. a part of framework logic that handles the execution of asynchronous, actor-based logic \cite[p. 97]{Gupta2012}. See figure \ref{fig:gil} for a basic illustration of resource mapping within an actor system.
+Incoming messages are handled via \textit{mailboxes}, which are basically actor-specific queues that receive, filter and defer incoming messages. Like in event-based architectures, there is no guarantee in which order messages arrive in the mailbox and---since the actor model does not specify a medium for passing messages (which may also be network-based, see below), a message can take arbitrarily long to reach its destination \cite[97]{Erb2012}. Since only the corresponding actor can access his mailbox and only one message is processed at a time, no concurrency issues---like race conditions---can arise for the actor state and the mailbox as well as in between messages \cite[p. 12]{Eriksson2013}. The orchestration of message processing is done by a \textit{dispatcher}, i.e. a part of framework logic that handles the execution of asynchronous, actor-based logic \cite[p. 97]{Gupta2012}. See figure \ref{fig:actorsfoo} for a basic illustration of resource mapping within an actor system.
 
 \begin{figure}
 \centering\small
 \setlength{\tabcolsep}{0mm}
   \includegraphics[width=.90\textwidth]{actors}
 \caption{This graphic illustrates how resources are handled in a typical actor system. A \textit{dispatcher} distributes messages of actors to operating system threads based on certain strategies (e.g. load balancing). Image source: \cite{Gupta2012}}.
-\label{fig:gil}
+\label{fig:actorsfoo}
 \end{figure}
 
 Actors are also \textit{resilient}, i.e. robust in the case of failure. \textit{Erlang}, one of the programming languages first to embrace the actor model, coined the term \textit{let-it-crash}; due to the isolated nature of actors, one actor unable to proceed working (i.e. \textit{crashing}) will not affect other actors. The actor model also supports hierarchical structures of actors, which enable supervising actors to restart crashed actors \cite{Armstrong2007}.
